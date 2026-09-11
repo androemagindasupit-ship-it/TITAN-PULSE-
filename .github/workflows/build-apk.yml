@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   build-apk:
@@ -41,24 +42,7 @@ jobs:
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager --install "platform-tools"
 
-          if sdkmanager --install "platforms;android-36" "build-tools;36.0.0"; then
-            echo "Using Android 36"
-          else
-            echo "Android 36 unavailable, using Android 35"
-            sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-
-            python3 - <<'PY'
-from pathlib import Path
-
-p = Path("android/variables.gradle")
-s = p.read_text()
-
-s = s.replace("compileSdkVersion = 36", "compileSdkVersion = 35")
-s = s.replace("targetSdkVersion = 36", "targetSdkVersion = 35")
-
-p.write_text(s)
-PY
-          fi
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install project dependencies
         shell: bash
@@ -86,7 +70,6 @@ PY
       - name: Setup Gradle 8.13
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.13'
           cache-provider: basic
           validate-wrappers: true
 
@@ -108,6 +91,12 @@ PY
         run: |
           ./gradlew assembleDebug --no-daemon --stacktrace --warning-mode all
 
+      - name: Build unsigned release APK
+        working-directory: android
+        shell: bash
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace --warning-mode all
+
       - name: Verify APK
         shell: bash
         run: |
@@ -120,15 +109,18 @@ PY
           ls -lh "$APK"
           file "$APK"
 
-      - name: Rename APK
+      - name: Prepare APK artifacts
         shell: bash
         run: |
           cp "android/app/build/outputs/apk/debug/app-debug.apk" "TITAN PULSE.apk"
+          cp "android/app/build/outputs/apk/release/app-release-unsigned.apk" "TITAN PULSE release unsigned.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TITAN-PULSE-APK
-          path: "TITAN PULSE.apk"
+          path: |
+            TITAN PULSE.apk
+            TITAN PULSE release unsigned.apk
           if-no-files-found: error
           retention-days: 7
