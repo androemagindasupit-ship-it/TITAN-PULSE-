@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace = 'com.titanpulse.app'
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId 'com.titanpulse.app'
+        minSdk = rootProject.ext.minSdkVersion
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    buildFeatures { buildConfig = true }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    packaging {
+        resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] }
+    }
+
+    buildTypes {
+        debug { debuggable true }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.android.material:material:1.13.0'
+    implementation 'androidx.room:room-runtime:2.8.4'
+    annotationProcessor 'androidx.room:room-compiler:2.8.4'
+
+    implementation platform('com.google.firebase:firebase-bom:34.18.0')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'androidx.activity:activity:1.13.0'
+    implementation 'androidx.core:core:1.19.0'
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+    implementation 'androidx.webkit:webkit:1.17.0'
+    implementation 'androidx.annotation:annotation:1.10.0'
+    implementation 'androidx.work:work-runtime:2.11.2'
+    implementation project(':capacitor-android')
+}
+
+// Inject the Capacitor Android library after npm install + npx cap sync.
+
+apply from: 'capacitor.build.gradle'

@@ -1,0 +1,4 @@
+// Generated/maintained by Capacitor CLI. The initial project includes the app module;
+// `npx cap sync android` wires the @capacitor/android dependency into this build.
+include ':capacitor-android'
+project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
