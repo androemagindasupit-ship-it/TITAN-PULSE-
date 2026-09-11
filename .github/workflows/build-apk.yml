@@ -67,12 +67,6 @@ jobs:
         run: |
           npx cap sync android
 
-      - name: Setup Gradle 8.13
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-provider: basic
-          validate-wrappers: true
-
       - name: Fix executable permissions
         shell: bash
         run: |
