@@ -2,17 +2,11 @@ name: Build TITAN PULSE APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-
-env:
-  NODE_VERSION: '22'
-  JAVA_VERSION: '21'
-  GRADLE_VERSION: '8.13'
 
 jobs:
   build-apk:
@@ -29,7 +23,7 @@ jobs:
           java-version: '21'
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -40,65 +34,24 @@ jobs:
         with:
           packages: ''
 
-      - name: Prepare Android SDK
+      - name: Install Android SDK
         shell: bash
         run: |
-          set -u
-
+          set -e
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-          sdkmanager --install "platform-tools"
-
-          if sdkmanager --install "platforms;android-36" "build-tools;36.0.0"; then
-            echo "ANDROID_API=36" >> "$GITHUB_ENV"
-            echo "ANDROID_BUILD_TOOLS=36.0.0" >> "$GITHUB_ENV"
-          else
-            echo "Android 36 unavailable; falling back to Android 35"
-
-            sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-
-            echo "ANDROID_API=35" >> "$GITHUB_ENV"
-            echo "ANDROID_BUILD_TOOLS=35.0.0" >> "$GITHUB_ENV"
-
-            python3 - <<'PY'
-from pathlib import Path
-
-p = Path("android/variables.gradle")
-s = p.read_text()
-
-s = s.replace(
-    "compileSdkVersion = 36",
-    "compileSdkVersion = 35"
-).replace(
-    "targetSdkVersion = 36",
-    "targetSdkVersion = 35"
-)
-
-p.write_text(s)
-PY
-          fi
-
-          echo "Android API selected: ${ANDROID_API:-unknown}"
-          echo "Build tools selected: ${ANDROID_BUILD_TOOLS:-unknown}"
-
-      - name: Fix Gradle wrapper permissions
-        shell: bash
-        run: |
-          chmod +x android/gradlew
-          git update-index --chmod=+x android/gradlew || true
-
-      - name: Ensure TypeScript exists
-        shell: bash
-        run: |
-          npm install --save-dev typescript
-          node -e "require('typescript'); console.log('TypeScript OK')"
-
-      - name: Install web dependencies
+      - name: Install dependencies
         shell: bash
         run: |
           npm ci
 
-      - name: Verify project structure
+      - name: Verify TypeScript
+        shell: bash
+        run: |
+          node -e "require('typescript'); console.log('TypeScript OK')"
+
+      - name: Verify project
         shell: bash
         run: |
           test -f package.json
@@ -108,56 +61,47 @@ PY
           test -f android/settings.gradle
           test -f android/build.gradle
           test -f android/app/build.gradle
-          test -f android/variables.gradle
-          echo "Project structure OK"
+          echo "Project verification OK"
 
-      - name: Sync Capacitor Android
+      - name: Sync Capacitor
         shell: bash
         run: |
           npx cap sync android
 
-      - name: Setup Gradle 8.13
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
           cache-provider: basic
-          validate-wrappers: false
 
-      - name: Verify toolchain
+      - name: Fix Gradle wrapper
         shell: bash
         run: |
-          java -version
-          node --version
-          npm --version
-          sdkmanager --version
-          gradle --version
+          chmod +x android/gradlew
+          git update-index --chmod=+x android/gradlew || true
 
-      - name: Clean previous Android outputs
+      - name: Clean Android build
         working-directory: android
         shell: bash
         run: |
-          gradle clean --no-daemon --stacktrace
+          gradle clean --no-daemon
 
-      - name: Build Debug APK
+      - name: Build APK
         working-directory: android
         shell: bash
         run: |
           gradle assembleDebug --no-daemon --stacktrace --warning-mode all
 
-      - name: Verify generated APK
+      - name: Verify APK
         shell: bash
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
-
           test -f "$APK"
           test -s "$APK"
-
-          echo "APK found:"
+          file "$APK"
           ls -lh "$APK"
 
-          file "$APK"
-
-      - name: Rename APK
+      - name: Prepare APK artifact
         shell: bash
         run: |
           cp "android/app/build/outputs/apk/debug/app-debug.apk" "TITAN PULSE.apk"
