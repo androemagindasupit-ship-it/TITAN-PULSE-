@@ -49,7 +49,9 @@ jobs:
 
       - name: Build installable debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: chmod +x ./gradlew
+find "$HOME/.gradle/wrapper/dists" -type f -path '*/bin/gradle' -exec chmod +x {} + 2>/dev/null || true
+./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk "TITAN PULSE.apk"
