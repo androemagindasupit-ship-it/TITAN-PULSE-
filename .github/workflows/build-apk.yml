@@ -63,7 +63,6 @@ PY
       - name: Install project dependencies
         shell: bash
         run: |
-          npm install --save-dev typescript
           npm ci
 
       - name: Verify project
@@ -89,7 +88,7 @@ PY
         with:
           gradle-version: '8.13'
           cache-provider: basic
-          validate-wrappers: false
+          validate-wrappers: true
 
       - name: Fix executable permissions
         shell: bash
@@ -101,13 +100,13 @@ PY
         working-directory: android
         shell: bash
         run: |
-          gradle clean --no-daemon --stacktrace
+          ./gradlew clean --no-daemon --stacktrace
 
       - name: Build APK
         working-directory: android
         shell: bash
         run: |
-          gradle assembleDebug --no-daemon --stacktrace --warning-mode all
+          ./gradlew assembleDebug --no-daemon --stacktrace --warning-mode all
 
       - name: Verify APK
         shell: bash

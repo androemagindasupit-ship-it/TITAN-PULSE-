@@ -69,7 +69,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    @Override protected void onDestroy() {
+    @Override public void onDestroy() {
         if (titanPulseBridge != null) titanPulseBridge.shutdown();
         titanPulseBridge = null;
         configured = false;

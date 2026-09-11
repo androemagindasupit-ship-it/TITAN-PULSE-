@@ -6,6 +6,7 @@ import android.content.res.AssetManager;
 import androidx.annotation.NonNull;
 
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.Timestamp;
@@ -116,13 +117,13 @@ public final class FirebaseSyncService {
         if (passwordForReauth == null || passwordForReauth.isEmpty() || email.isEmpty()) throw new IllegalStateException("لأسباب أمنية يجب إعادة تأكيد كلمة مرور الحساب قبل الحذف.");
         com.google.firebase.auth.AuthCredential credential = EmailAuthProvider.getCredential(email, passwordForReauth);
         return auth().getCurrentUser().reauthenticate(credential).continueWithTask(task -> {
-            if (!task.isSuccessful()) throw new Exception(task.getException() == null ? "تعذر إعادة تأكيد الحساب." : task.getException());
+            if (!task.isSuccessful()) throw taskFailure(task, "تعذر إعادة تأكيد الحساب.");
             return deleteAllCollectionsAsync(uid);
         }).continueWithTask(task -> {
-            if (!task.isSuccessful()) throw new Exception(task.getException() == null ? "تعذر حذف البيانات السحابية." : task.getException());
+            if (!task.isSuccessful()) throw taskFailure(task, "تعذر حذف البيانات السحابية.");
             return db().collection("users").document(uid).delete();
         }).continueWithTask(task -> {
-            if (!task.isSuccessful()) throw new Exception(task.getException() == null ? "تعذر حذف سجل الحساب." : task.getException());
+            if (!task.isSuccessful()) throw taskFailure(task, "تعذر حذف سجل الحساب.");
             if (auth().getCurrentUser() == null) return com.google.android.gms.tasks.Tasks.forResult(null);
             return auth().getCurrentUser().delete();
         });
@@ -133,7 +134,7 @@ public final class FirebaseSyncService {
         for (String collection : new String[]{"projects", "workspaces", "drafts", "jobs"}) {
             final String c = collection;
             chain = chain.continueWithTask(task -> {
-                if (!task.isSuccessful()) throw new Exception(task.getException() == null ? "تعذر حذف البيانات." : task.getException());
+                if (!task.isSuccessful()) throw taskFailure(task, "تعذر حذف البيانات.");
                 return deleteCollectionAsync(uid, c);
             });
         }
@@ -143,13 +144,13 @@ public final class FirebaseSyncService {
     private Task<Void> deleteCollectionAsync(String uid, String collection) {
         DocumentReference parent = db().collection("users").document(uid);
         return parent.collection(collection).limit(PAGE_SIZE).get().continueWithTask(task -> {
-            if (!task.isSuccessful()) throw new Exception(task.getException() == null ? "تعذر قراءة البيانات." : task.getException());
+            if (!task.isSuccessful()) throw taskFailure(task, "تعذر قراءة البيانات.");
             List<DocumentSnapshot> docs = task.getResult() == null ? new ArrayList<>() : task.getResult().getDocuments();
             if (docs.isEmpty()) return com.google.android.gms.tasks.Tasks.forResult(null);
             com.google.firebase.firestore.WriteBatch batch = db().batch();
             for (DocumentSnapshot d : docs) batch.delete(d.getReference());
             return batch.commit().continueWithTask(commit -> {
-                if (!commit.isSuccessful()) throw new Exception(commit.getException() == null ? "تعذر حذف البيانات." : commit.getException());
+                if (!commit.isSuccessful()) throw taskFailure(commit, "تعذر حذف البيانات.");
                 return deleteCollectionAsync(uid, collection);
             });
         });
@@ -167,8 +168,13 @@ public final class FirebaseSyncService {
         copy.put("serverSchema", 1);
 
         Tasks.await(db().runTransaction(new Transaction.Function<Boolean>() {
-            @Override public Boolean apply(@NonNull Transaction transaction) throws Exception {
-                DocumentSnapshot remote = transaction.get(ref);
+            @Override public Boolean apply(@NonNull Transaction transaction) {
+                DocumentSnapshot remote;
+                try {
+                    remote = transaction.get(ref);
+                } catch (com.google.firebase.firestore.FirebaseFirestoreException e) {
+                    throw new RuntimeException(e);
+                }
                 if (!remote.exists()) {
                     Map<String, Object> data = new HashMap<>(copy);
                     data.put("serverUpdatedAt", FieldValue.serverTimestamp());
@@ -232,6 +238,10 @@ public final class FirebaseSyncService {
     }
 
     private static long number(Object value) { return value instanceof Number ? ((Number) value).longValue() : 0L; }
+    private static Exception taskFailure(Task<?> task, String message) {
+        Throwable cause = task.getException();
+        return cause == null ? new Exception(message) : new Exception(message, cause);
+    }
     private void ensureReady() { if (!initialized) throw new IllegalStateException("Firebase غير مهيأ"); }
 
     private static void validateCredentials(String email, String password) {

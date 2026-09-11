@@ -312,6 +312,7 @@ public final class TitanPulseBridge {
 
     void maybeScheduleFromActivityState() {
         try {
+            String owner = getOwnerId();
             if (!"1".equals(prefs.getString("app_foreground", "1"))) {
                 String jobId = prefs.getString("active_job_id", "");
                 if (!jobId.isEmpty()) {

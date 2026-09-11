@@ -332,7 +332,7 @@ public final class BackgroundBuildWorker extends Worker {
         }
     }
 
-    private String readAll(InputStream is) throws Exception {
+    private static String readAll(InputStream is) throws Exception {
         if (is == null) return "";
         StringBuilder s = new StringBuilder();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
