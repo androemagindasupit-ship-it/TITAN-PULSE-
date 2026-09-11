@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: package.json
+          cache-dependency-path: package-lock.json
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -49,9 +49,12 @@ jobs:
 
       - name: Build installable debug APK
         working-directory: android
-        run: chmod +x ./gradlew
-find "$HOME/.gradle/wrapper/dists" -type f -path '*/bin/gradle' -exec chmod +x {} + 2>/dev/null || true
-./gradlew assembleDebug --no-daemon --stacktrace
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --version || true
+          find "$HOME/.gradle/wrapper/dists" -type f -path '*/bin/gradle' -exec chmod +x {} + 2>/dev/null || true
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk "TITAN PULSE.apk"
