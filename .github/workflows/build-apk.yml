@@ -2,7 +2,8 @@ name: Build TITAN PULSE APK
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -22,7 +23,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Setup Node.js 22
+      - name: Setup Node 22
         uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -31,25 +32,39 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: ''
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
+
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install "platform-tools"
 
-      - name: Install dependencies
+          if sdkmanager --install "platforms;android-36" "build-tools;36.0.0"; then
+            echo "Using Android 36"
+          else
+            echo "Android 36 unavailable, using Android 35"
+            sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+            python3 - <<'PY'
+from pathlib import Path
+
+p = Path("android/variables.gradle")
+s = p.read_text()
+
+s = s.replace("compileSdkVersion = 36", "compileSdkVersion = 35")
+s = s.replace("targetSdkVersion = 36", "targetSdkVersion = 35")
+
+p.write_text(s)
+PY
+          fi
+
+      - name: Install project dependencies
         shell: bash
         run: |
+          npm install --save-dev typescript
           npm ci
-
-      - name: Verify TypeScript
-        shell: bash
-        run: |
-          node -e "require('typescript'); console.log('TypeScript OK')"
 
       - name: Verify project
         shell: bash
@@ -61,30 +76,32 @@ jobs:
           test -f android/settings.gradle
           test -f android/build.gradle
           test -f android/app/build.gradle
-          echo "Project verification OK"
+          test -f android/variables.gradle
+          node -e "require('typescript'); console.log('TypeScript OK')"
 
       - name: Sync Capacitor
         shell: bash
         run: |
           npx cap sync android
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.13
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.13'
           cache-provider: basic
+          validate-wrappers: false
 
-      - name: Fix Gradle wrapper
+      - name: Fix executable permissions
         shell: bash
         run: |
-          chmod +x android/gradlew
+          chmod +x android/gradlew || true
           git update-index --chmod=+x android/gradlew || true
 
-      - name: Clean Android build
+      - name: Clean Android
         working-directory: android
         shell: bash
         run: |
-          gradle clean --no-daemon
+          gradle clean --no-daemon --stacktrace
 
       - name: Build APK
         working-directory: android
@@ -96,12 +113,15 @@ jobs:
         shell: bash
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
+
           test -f "$APK"
           test -s "$APK"
-          file "$APK"
-          ls -lh "$APK"
 
-      - name: Prepare APK artifact
+          echo "========== APK SUCCESS =========="
+          ls -lh "$APK"
+          file "$APK"
+
+      - name: Rename APK
         shell: bash
         run: |
           cp "android/app/build/outputs/apk/debug/app-debug.apk" "TITAN PULSE.apk"
